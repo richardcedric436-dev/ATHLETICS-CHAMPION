@@ -27,8 +27,8 @@ h1 em{color:var(--g);font-style:normal}
 #msg{position:absolute;left:0;right:0;top:34%;text-align:center;font-size:clamp(28px,9vw,80px);font-weight:900;text-shadow:0 0 24px var(--g);color:var(--g)}
 #st{position:absolute;left:50%;bottom:calc(86px + env(safe-area-inset-bottom,0px));width:min(60vw,320px);transform:translateX(-50%);font-size:10px;letter-spacing:.14em;text-align:center}
 #st i{display:block;height:10px;margin-top:4px;border-radius:5px;background:linear-gradient(90deg,#ff3b3b,var(--g),#3bff6a);transform-origin:left;box-shadow:0 0 10px var(--g)}
-#tap{display:none;position:absolute;left:50%;bottom:calc(16px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);width:160px;height:60px;border-radius:30px;border:2px solid var(--g);background:rgba(255,212,0,.2);color:#fff;font:900 16px Orbitron,Arial;pointer-events:auto;touch-action:manipulation}
-@media (pointer:coarse){#tap{display:block}}
+#tb{display:none;position:absolute;left:0;right:0;bottom:calc(14px + env(safe-area-inset-bottom,0px));justify-content:center;gap:10px;pointer-events:auto}#tb button{height:62px;min-width:96px;padding:0 14px;border-radius:31px;border:2px solid var(--g);background:rgba(255,212,0,.2);color:#fff;font:900 14px Orbitron,Arial;touch-action:none}#tb button.on{background:rgba(255,212,0,.6)}#tb #spr{border-color:#ff3b3b;background:rgba(255,59,59,.25)}
+@media (pointer:coarse){#tb{display:flex}}
 .r{display:grid;grid-template-columns:28px 1fr auto;gap:8px;padding:7px 12px;margin:4px 0;border-radius:10px;background:rgba(15,20,60,.9);text-align:left;font-size:13px}
 .r.me{border:1px solid var(--g);box-shadow:0 0 12px var(--g)}
 </style></head><body>
@@ -39,7 +39,7 @@ h1 em{color:var(--g);font-style:normal}
 <div class="ev" id="ev"></div>
 <div class="chips"><span>MODE COMPÉTITION</span><span>ATHLÈTES 8</span><span id="rec">RECORD —</span></div>
 <div class="btn" id="go">LANCER LA COURSE →</div>
-<div class="hint">ESPACE (ou bouton tactile) : tape le plus vite possible pour courir<br>Sur les longues distances, garde ton endurance · ÉCHAP : quitter</div>
+<div class="hint">MAINTIENS ESPACE (ou →) pour courir · ajoute MAJ (ou ↑) pour sprinter<br>ENTRÉE : course automatique, plus besoin de tenir · taper reste possible<br>Sur les longues distances, garde ton endurance · ÉCHAP : quitter</div>
 </div></div>
 <div id="hud">
 <div class="hb" style="left:14px">DISTANCE<b id="hd">0 / 100 m</b></div>
@@ -47,14 +47,14 @@ h1 em{color:var(--g);font-style:normal}
 <div class="hb" style="right:14px;text-align:right">VITESSE<b id="hv">0 km/h</b><span id="hp">1 / 8</span></div>
 <div id="msg"></div>
 <div id="st">ENDURANCE<i id="sb"></i></div>
-<button id="tap">COURIR !</button>
+<div id="tb"><button id="auto">AUTO</button><button id="tap">COURIR</button><button id="spr">SPRINT</button></div>
 </div>
 <div id="res" class="ov" style="display:none"><div class="in"><div class="sub">ÉPREUVE TERMINÉE</div><h1 id="rt">BRAVO !</h1><div id="rl" style="margin-top:16px"></div><div class="btn" id="back">RETOURNER AU MENU</div></div></div>
 <script>
 const $=id=>document.getElementById(id);
 const EV=[[100,'SPRINT',10.5,30],[200,'SPRINT',10.2,24],[300,'VITESSE',9.4,42],[400,'1 TOUR',8.7,50],[500,'DEMI-FOND',8.1,70],[600,'DEMI-FOND',7.7,85],[800,'DEMI-FOND',7.1,120],[1000,'DEMI-FOND',6.7,150]];
 const COL=['#e53935','#1e88e5','#fdd835','#43a047','#8e24aa','#fb8c00','#00acc1','#eeeeee'],SKIN=['#f1c27d','#8d5524','#c68642','#e0ac69','#6b4226','#ffdbac','#a0673a','#d2a679'];
-let ev=0,state='menu',T=0,ct=0,rc=0,D=100,VM=10.5,EN=30,S=100,taps=[],A=[],P,stadium,done=0,doneT=0,shake=0,ac;
+let hold=0,spr=0,auto=0;let ev=0,state='menu',T=0,ct=0,rc=0,D=100,VM=10.5,EN=30,S=100,taps=[],A=[],P,stadium,done=0,doneT=0,shake=0,ac;
 const renderer=new THREE.WebGLRenderer({antialias:true});renderer.setPixelRatio(Math.min(devicePixelRatio||1,2));renderer.setSize(innerWidth,innerHeight);document.body.prepend(renderer.domElement);
 const scene=new THREE.Scene(),cam=new THREE.PerspectiveCamera(60,innerWidth/innerHeight,.1,700);
 scene.fog=new THREE.Fog(0x3a2f5e,80,320);
@@ -103,7 +103,7 @@ function pose(a,v,lean,crouch){
  a.aL.rotation.x=-s*Am*.9;a.aR.rotation.x=s*Am*.9;a.eL.rotation.x=a.eR.rotation.x=-1.3*k-.15}
 for(let i=0;i<8;i++){const a=mkAth(COL[i],SKIN[i]);a.x=(i-3.5)*1.4;a.lane=i;scene.add(a.g);A.push(a)}
 P=A[3];
-function reset(){A.forEach(a=>{a.z=0;a.v=0;a.fin=0;a.t=0;a.ph=0;a.f=.9+Math.random()*.085;a.fd=.3+Math.random()*.7;a.g.position.set(a.x,0,0)});S=100;taps=[];done=0;doneT=0;rc=0}
+function reset(){A.forEach(a=>{a.z=0;a.v=0;a.fin=0;a.t=0;a.ph=0;a.f=.9+Math.random()*.085;a.fd=.3+Math.random()*.7;a.g.position.set(a.x,0,0)});S=100;taps=[];done=0;doneT=0;rc=0;auto=0}
 function beep(f,d){try{ac=ac||new (window.AudioContext||window.webkitAudioContext)();const o=ac.createOscillator(),g=ac.createGain();o.frequency.value=f;g.gain.value=.12;o.connect(g).connect(ac.destination);o.start();o.stop(ac.currentTime+d)}catch(e){}}
 function fmt(t){return String(t/60|0).padStart(2,'0')+':'+(t%60).toFixed(2).padStart(5,'0')}
 function best(){try{return+localStorage.getItem('ac_best_'+EV[ev][0])||0}catch(e){return 0}}
@@ -113,8 +113,11 @@ $('ev').addEventListener('click',e=>{const d=e.target.closest('[data-i]');if(d){
 $('go').onclick=()=>{try{ac=ac||new (window.AudioContext||window.webkitAudioContext)();ac.resume()}catch(e){}reset();state='marks';ct=0;$('menu').style.display='none';$('hud').style.display='block';$('msg').textContent='À VOS MARQUES…'};
 $('back').onclick=menu;
 function tap(){if(state==='run'){taps.push(performance.now())}}
-addEventListener('keydown',e=>{if(e.code==='Space'){e.preventDefault();if(!e.repeat)tap()}if(e.code==='Escape')menu()});
-$('tap').addEventListener('pointerdown',e=>{e.preventDefault();tap()});
+const K={};
+addEventListener('keydown',e=>{if(['Space','ArrowRight','ArrowUp','ShiftLeft','ShiftRight','Enter','KeyD','KeyW'].includes(e.code))e.preventDefault();if(e.repeat)return;K[e.code]=1;if(e.code==='Space')tap();if(e.code==='Enter')auto=!auto;if(e.code==='Escape')menu()});
+addEventListener('keyup',e=>{K[e.code]=0});
+const hb=(id,f)=>{const b=$(id);b.addEventListener('pointerdown',e=>{e.preventDefault();f(1);b.classList.add('on')});for(const n of['pointerup','pointerleave','pointercancel'])b.addEventListener(n,()=>{f(0);b.classList.remove('on')})};
+hb('tap',v=>hold=v);hb('spr',v=>spr=v);$('auto').addEventListener('pointerdown',e=>{e.preventDefault();auto=!auto});
 function results(){const o=[...A].sort((a,b)=>(b.fin-a.fin)||(a.fin?a.t-b.t:b.z-a.z)),me=o.indexOf(P)+1;
  if(P.fin){const b=best();if(!b||P.t<b)try{localStorage.setItem('ac_best_'+D,P.t)}catch(e){}}
  $('rt').textContent=me===1?'VICTOIRE !':me<=3?'PODIUM · P'+me:'BRAVO ! · P'+me;
@@ -130,7 +133,7 @@ function update(dt){
   for(const a of A){
    if(a.fin){a.v=Math.max(0,a.v-3*dt)}
    else if(a===P){
-    const cap=vmx*(.55+.45*S/100),tv=Math.min(cap,vmx*Math.min(1.02,rate/5.5));
+    const hd=K.Space||K.ArrowRight||K.KeyD||hold||auto,sp=K.ShiftLeft||K.ShiftRight||K.ArrowUp||K.KeyW||spr,it=Math.max(sp?1.02:hd?.8:0,Math.min(1.02,rate/5.5)),cap=vmx*(.55+.45*S/100),tv=Math.min(cap,vmx*it);
     a.v+=Math.max(-4*dt,Math.min(5*dt,tv-a.v));if(a.v<0)a.v=0;
     const r=a.v/vmx;S-=Math.pow(r,3)*100/EN*dt;if(r<.5)S+=4*dt;S=Math.max(0,Math.min(100,S))}
    else{const pr=a.z/D,tv=vmx*a.f*(1-.1*a.fd*Math.max(0,(pr-.55)/.45))*(.985+.015*Math.sin(T*.8+a.lane));a.v+=Math.max(-4*dt,Math.min(5.2*dt,tv-a.v))}
@@ -141,7 +144,7 @@ function update(dt){
   if(state==='done'){doneT+=dt;if(doneT>3.5)results()}}
  for(const a of A){a.g.position.x=a.x;a.g.position.z=a.z;pose(a,a.v,state==='marks'?.55:state==='set'?.8:Math.min(.35,.08+a.v*.025),state==='marks'?1:state==='set'?.6:0)}
  const rank=A.filter(a=>a.z>P.z).length+1;
- $('hd').textContent=Math.min(D,Math.floor(P.z))+' / '+D+' m';$('hc').textContent=fmt(P.fin?P.t:rc);$('hv').textContent=Math.round(P.v*3.6)+' km/h';$('hp').textContent=rank+' / 8';$('sb').style.transform='scaleX('+Math.max(.02,S/100)+')'}
+ $('hd').textContent=Math.min(D,Math.floor(P.z))+' / '+D+' m';$('hc').textContent=fmt(P.fin?P.t:rc);$('hv').textContent=Math.round(P.v*3.6)+' km/h';$('hp').textContent=rank+' / 8';$('sb').style.transform='scaleX('+Math.max(.02,S/100)+')';$('auto').classList.toggle('on',!!auto)}
 function camUpdate(dt){
  if(state==='menu'||state==='done2'){const a=T*.15;cam.position.set(Math.sin(a)*13,4,8+Math.cos(a)*11);cam.lookAt(0,1.4,8);cam.fov=60}
  else{const v=P.v,tx=P.x*.8,tz=P.z-6.5-v*.12;cam.position.x+=(tx-cam.position.x)*Math.min(1,dt*6);cam.position.z+=(tz-cam.position.z)*Math.min(1,dt*8);cam.position.y=2.4+Math.sin(T*18)*.02*Math.min(1,v/6);
